@@ -26,39 +26,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import io.fabric8.kubernetes.api.model.AffinityBuilder;
-import io.fabric8.kubernetes.api.model.Capabilities;
-import io.fabric8.kubernetes.api.model.ConfigMapKeySelector;
-import io.fabric8.kubernetes.api.model.ConfigMapVolumeSource;
-import io.fabric8.kubernetes.api.model.ConfigMapVolumeSourceBuilder;
-import io.fabric8.kubernetes.api.model.Container;
-import io.fabric8.kubernetes.api.model.EnvVar;
-import io.fabric8.kubernetes.api.model.HostPathVolumeSource;
-import io.fabric8.kubernetes.api.model.HostPathVolumeSourceBuilder;
-import io.fabric8.kubernetes.api.model.KeyToPath;
-import io.fabric8.kubernetes.api.model.LabelSelector;
-import io.fabric8.kubernetes.api.model.LabelSelectorRequirementBuilder;
-import io.fabric8.kubernetes.api.model.NodeAffinity;
-import io.fabric8.kubernetes.api.model.NodeSelectorRequirementBuilder;
-import io.fabric8.kubernetes.api.model.NodeSelectorTerm;
-import io.fabric8.kubernetes.api.model.PodAffinity;
-import io.fabric8.kubernetes.api.model.PodAffinityTerm;
-import io.fabric8.kubernetes.api.model.PodAntiAffinity;
-import io.fabric8.kubernetes.api.model.PodSecurityContext;
-import io.fabric8.kubernetes.api.model.PodSecurityContextBuilder;
-import io.fabric8.kubernetes.api.model.PodSpec;
-import io.fabric8.kubernetes.api.model.PreferredSchedulingTerm;
-import io.fabric8.kubernetes.api.model.SELinuxOptions;
-import io.fabric8.kubernetes.api.model.SeccompProfile;
-import io.fabric8.kubernetes.api.model.SecretKeySelector;
-import io.fabric8.kubernetes.api.model.SecurityContext;
-import io.fabric8.kubernetes.api.model.SecurityContextBuilder;
-import io.fabric8.kubernetes.api.model.Sysctl;
-import io.fabric8.kubernetes.api.model.Toleration;
-import io.fabric8.kubernetes.api.model.Volume;
-import io.fabric8.kubernetes.api.model.VolumeBuilder;
-import io.fabric8.kubernetes.api.model.WeightedPodAffinityTerm;
-import io.fabric8.kubernetes.api.model.WindowsSecurityContextOptions;
+import io.fabric8.kubernetes.api.model.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -927,7 +895,7 @@ public class KubernetesAppDeployerTests {
     @Test
     public void testMultipleInitContainerProperties() {
         Map<String, String> props = new HashMap<>();
-        props.put("spring.cloud.deployer.kubernetes.initContainers[0]", "{ \"imageName\": \"busybox:1\", \"containerName\": \"bb_s1\", \"commands\": [\"sh\", \"-c\", \"script1.sh\"] }");
+        props.put("spring.cloud.deployer.kubernetes.initContainers[0]", "{ \"imageName\": \"busybox:1\", \"containerName\": \"bb_s1\", \"commands\": [\"sh\", \"-c\", \"script1.sh\"], \"environmentVariablesFromFieldRefs\": [\"POD_UID=metadata.uid\"] }");
         props.put("spring.cloud.deployer.kubernetes.initContainers[1].imageName", "busybox:2");
         props.put("spring.cloud.deployer.kubernetes.initContainers[1].containerName", "bb_s2");
         props.put("spring.cloud.deployer.kubernetes.initContainers[1].commands", "sh,-c,script2.sh");
@@ -944,6 +912,7 @@ public class KubernetesAppDeployerTests {
         assertThat(container0.getImage()).isEqualTo("busybox:1");
         assertThat(container0.getName()).isEqualTo("bb_s1");
         assertThat(container0.getCommand()).containsExactly("sh", "-c", "script1.sh");
+        assertThat(container0.getEnv()).containsExactly(new EnvVar("POD_UID", null, new EnvVarSourceBuilder().withFieldRef(new ObjectFieldSelectorBuilder().withFieldPath("metadata.uid").build()).build()));
         Container container1 = podSpec.getInitContainers().get(1);
         assertThat(container1.getImage()).isEqualTo("busybox:2");
         assertThat(container1.getName()).isEqualTo("bb_s2");

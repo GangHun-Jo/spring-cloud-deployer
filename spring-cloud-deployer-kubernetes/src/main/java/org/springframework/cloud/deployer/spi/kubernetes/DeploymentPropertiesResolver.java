@@ -28,28 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import io.fabric8.kubernetes.api.model.Affinity;
-import io.fabric8.kubernetes.api.model.AffinityBuilder;
-import io.fabric8.kubernetes.api.model.CapabilitiesBuilder;
-import io.fabric8.kubernetes.api.model.ConfigMapEnvSource;
-import io.fabric8.kubernetes.api.model.ConfigMapKeySelector;
-import io.fabric8.kubernetes.api.model.Container;
-import io.fabric8.kubernetes.api.model.ContainerBuilder;
-import io.fabric8.kubernetes.api.model.EnvFromSource;
-import io.fabric8.kubernetes.api.model.EnvVar;
-import io.fabric8.kubernetes.api.model.EnvVarSource;
-import io.fabric8.kubernetes.api.model.PodSecurityContext;
-import io.fabric8.kubernetes.api.model.PodSecurityContextBuilder;
-import io.fabric8.kubernetes.api.model.Quantity;
-import io.fabric8.kubernetes.api.model.SecretEnvSource;
-import io.fabric8.kubernetes.api.model.SecretKeySelector;
-import io.fabric8.kubernetes.api.model.SecurityContext;
-import io.fabric8.kubernetes.api.model.SecurityContextBuilder;
-import io.fabric8.kubernetes.api.model.Sysctl;
-import io.fabric8.kubernetes.api.model.SysctlBuilder;
-import io.fabric8.kubernetes.api.model.Toleration;
-import io.fabric8.kubernetes.api.model.Volume;
-import io.fabric8.kubernetes.api.model.VolumeMount;
+import io.fabric8.kubernetes.api.model.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -666,12 +645,15 @@ class DeploymentPropertiesResolver {
 	}
 
 	private Container containerFromProps(InitContainer initContainerProps) {
+		List<EnvVar> envVarList = new ArrayList<>();
+		envVarList.addAll(toEnvironmentVariables(initContainerProps.getEnvironmentVariables()));
+		envVarList.addAll(toEnvironmentVariablesFrom(initContainerProps.getEnvironmentVariablesFromFieldRefs()));
 		return new ContainerBuilder()
 				.withName(initContainerProps.getContainerName())
 				.withImage(initContainerProps.getImageName())
 				.withCommand(initContainerProps.getCommands())
 				.withArgs(initContainerProps.getArgs())
-				.withEnv(toEnvironmentVariables(initContainerProps.getEnvironmentVariables()))
+				.withEnv(envVarList)
 				.addAllToVolumeMounts(Optional.ofNullable(initContainerProps.getVolumeMounts()).orElse(Collections.emptyList()))
 				.build();
 	}
@@ -689,6 +671,25 @@ class DeploymentPropertiesResolver {
 		List<EnvVar> envVars = new ArrayList<>();
 		for (Map.Entry<String, String> e : envVarsMap.entrySet()) {
 			envVars.add(new EnvVar(e.getKey(), e.getValue(), null));
+		}
+		return envVars;
+	}
+
+	private List<EnvVar>  toEnvironmentVariablesFrom(String[] environmentVariablesFrom) {
+		Map<String, String> envVarsMap = new HashMap<>();
+		if (environmentVariablesFrom != null) {
+			for (String envVar : environmentVariablesFrom) {
+				String[] strings = envVar.split("=", 2);
+				Assert.isTrue(strings.length == 2, "Invalid environment variable declared: " + envVar);
+				envVarsMap.put(strings[0], strings[1]);
+			}
+		}
+
+		List<EnvVar> envVars = new ArrayList<>();
+		for (Map.Entry<String, String> e : envVarsMap.entrySet()) {
+			EnvVarSource envVarSource = new EnvVarSource();
+			envVarSource.setFieldRef(new ObjectFieldSelector(null, e.getValue()));
+			envVars.add(new EnvVar(e.getKey(), null, envVarSource));
 		}
 		return envVars;
 	}

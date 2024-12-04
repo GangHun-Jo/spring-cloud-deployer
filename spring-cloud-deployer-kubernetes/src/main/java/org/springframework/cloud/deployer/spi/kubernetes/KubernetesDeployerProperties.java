@@ -900,6 +900,7 @@ public class KubernetesDeployerProperties {
          * Environment variables to set for any deployed init container.
          */
         private String[] environmentVariables = new String[]{};
+		private String[] environmentVariablesFromFieldRefs = new String[]{};
 
         public String getImageName() {
             return imageName;
@@ -948,7 +949,15 @@ public class KubernetesDeployerProperties {
         public void setEnvironmentVariables(String[] environmentVariables) {
             this.environmentVariables = environmentVariables;
         }
-    }
+
+		public String[] getEnvironmentVariablesFromFieldRefs() {
+			return environmentVariablesFromFieldRefs;
+		}
+
+		public void setEnvironmentVariablesFromFieldRefs(String[] environmentVariablesFromFieldRefs) {
+			this.environmentVariablesFromFieldRefs = environmentVariablesFromFieldRefs;
+		}
+	}
 
     /**
      * The {@link RestartPolicy} to use. Defaults to {@link RestartPolicy#Always}.
