@@ -28,13 +28,7 @@ import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.fabric8.kubernetes.api.model.Container;
-import io.fabric8.kubernetes.api.model.ContainerBuilder;
-import io.fabric8.kubernetes.api.model.EnvFromSource;
-import io.fabric8.kubernetes.api.model.EnvVar;
-import io.fabric8.kubernetes.api.model.EnvVarSource;
-import io.fabric8.kubernetes.api.model.ObjectFieldSelector;
-import io.fabric8.kubernetes.api.model.Probe;
+import io.fabric8.kubernetes.api.model.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -91,10 +85,17 @@ public class DefaultContainerFactory implements ContainerFactory {
             Assert.isTrue(strings.length == 2, "Invalid environment variable declared: " + envVar);
             envVarsMap.put(strings[0], strings[1]);
         }
+        Map<String, String> envVarsFromFieldMap = new HashMap<>();
+        for (String envVar : this.properties.getEnvironmentVariablesFromFieldRefs()) {
+            String[] strings = envVar.split("=", 2);
+            Assert.isTrue(strings.length == 2, "Invalid environment variable declared: " + envVar);
+            envVarsFromFieldMap.put(strings[0], strings[1]);
+        }
         //Create EnvVar entries for additional variables set at the app level
         //For instance, this may be used to set JAVA_OPTS independently for each app if the base container
         //image supports it.
         envVarsMap.putAll(deploymentPropertiesResolver.getAppEnvironmentVariables(deploymentProperties));
+        envVarsFromFieldMap.putAll(deploymentPropertiesResolver.getAppEnvironmentVariablesFromFieldRefs(deploymentProperties));
 
         List<String> appArgs = new ArrayList<>();
 
@@ -152,6 +153,9 @@ public class DefaultContainerFactory implements ContainerFactory {
         List<EnvVar> envVars = new ArrayList<>();
         for (Map.Entry<String, String> e : envVarsMap.entrySet()) {
             envVars.add(new EnvVar(e.getKey(), e.getValue(), null));
+        }
+        for (Map.Entry<String, String> e : envVarsFromFieldMap.entrySet()) {
+            envVars.add(new EnvVarBuilder().withName(e.getKey()).withValueFrom(new EnvVarSourceBuilder().withFieldRef(new ObjectFieldSelectorBuilder().withFieldPath(e.getValue()).build()).build()).build());
         }
 
         envVars.addAll(deploymentPropertiesResolver.getSecretKeyRefs(deploymentProperties));

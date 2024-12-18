@@ -647,13 +647,17 @@ class DeploymentPropertiesResolver {
 	private Container containerFromProps(InitContainer initContainerProps) {
 		List<EnvVar> envVarList = new ArrayList<>();
 		envVarList.addAll(toEnvironmentVariables(initContainerProps.getEnvironmentVariables()));
-		envVarList.addAll(toEnvironmentVariablesFrom(initContainerProps.getEnvironmentVariablesFromFieldRefs()));
+		envVarList.addAll(toEnvironmentVariablesFromFieldPath(initContainerProps.getEnvironmentVariablesFromFieldRefs()));
+		List<EnvFromSource> envVarSourceList = new ArrayList<>();
+		envVarSourceList.addAll(Arrays.stream(initContainerProps.getConfigMapRefEnvVars()).map(this::buildConfigMapRefEnvVar).collect(Collectors.toList()));
+		envVarSourceList.addAll(Arrays.stream(initContainerProps.getSecretRefEnvVars()).map(this::buildSecretRefEnvVar).collect(Collectors.toList()));
 		return new ContainerBuilder()
 				.withName(initContainerProps.getContainerName())
 				.withImage(initContainerProps.getImageName())
 				.withCommand(initContainerProps.getCommands())
 				.withArgs(initContainerProps.getArgs())
 				.withEnv(envVarList)
+				.withEnvFrom(envVarSourceList)
 				.addAllToVolumeMounts(Optional.ofNullable(initContainerProps.getVolumeMounts()).orElse(Collections.emptyList()))
 				.build();
 	}
@@ -675,7 +679,7 @@ class DeploymentPropertiesResolver {
 		return envVars;
 	}
 
-	private List<EnvVar>  toEnvironmentVariablesFrom(String[] environmentVariablesFrom) {
+	private List<EnvVar> toEnvironmentVariablesFromFieldPath(String[] environmentVariablesFrom) {
 		Map<String, String> envVarsMap = new HashMap<>();
 		if (environmentVariablesFrom != null) {
 			for (String envVar : environmentVariablesFrom) {
@@ -685,13 +689,9 @@ class DeploymentPropertiesResolver {
 			}
 		}
 
-		List<EnvVar> envVars = new ArrayList<>();
-		for (Map.Entry<String, String> e : envVarsMap.entrySet()) {
-			EnvVarSource envVarSource = new EnvVarSource();
-			envVarSource.setFieldRef(new ObjectFieldSelector(null, e.getValue()));
-			envVars.add(new EnvVar(e.getKey(), null, envVarSource));
-		}
-		return envVars;
+		return envVarsMap.entrySet().stream().map(e -> new EnvVar(e.getKey(), null, new EnvVarSourceBuilder()
+				.withFieldRef(new ObjectFieldSelectorBuilder().withFieldPath(e.getValue()).build()).build()))
+				.collect(Collectors.toList());
 	}
 
 	List<Container> getAdditionalContainers(Map<String, String> deploymentProperties) {
@@ -1001,6 +1001,24 @@ class DeploymentPropertiesResolver {
 		Map<String, String> appEnvVarMap = new HashMap<>();
 		String appEnvVar = PropertyParserUtils.getDeploymentPropertyValue(deploymentProperties,
 				this.propertyPrefix + ".environmentVariables", null);
+
+		if (appEnvVar != null) {
+			String[] appEnvVars = new NestedCommaDelimitedVariableParser().parse(appEnvVar);
+			for (String envVar : appEnvVars) {
+				logger.trace("Adding environment variable from AppDeploymentRequest: " + envVar);
+				String[] strings = envVar.split("=", 2);
+				Assert.isTrue(strings.length == 2, "Invalid environment variable declared: " + envVar);
+				appEnvVarMap.put(strings[0], strings[1]);
+			}
+		}
+
+		return appEnvVarMap;
+	}
+
+	Map<String, String> getAppEnvironmentVariablesFromFieldRefs(Map<String, String> deploymentProperties) {
+		Map<String, String> appEnvVarMap = new HashMap<>();
+		String appEnvVar = PropertyParserUtils.getDeploymentPropertyValue(deploymentProperties,
+				this.propertyPrefix + ".environmentVariablesFromFieldRefs", null);
 
 		if (appEnvVar != null) {
 			String[] appEnvVars = new NestedCommaDelimitedVariableParser().parse(appEnvVar);

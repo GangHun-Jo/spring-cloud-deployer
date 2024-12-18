@@ -267,6 +267,21 @@ public class KubernetesAppDeployerTests {
     }
 
     @Test
+    public void deployWithEnvironmentFromFieldRefWithCommaDelimitedValue() throws Exception {
+        AppDefinition definition = new AppDefinition("app-test", null);
+        Map<String, String> props = new HashMap<>();
+        props.put("spring.cloud.deployer.kubernetes.environmentVariablesFromFieldRefs", "POD_NAME='metadata.name'");
+
+        AppDeploymentRequest appDeploymentRequest = new AppDeploymentRequest(definition, getResource(), props);
+
+        deployer = k8sAppDeployer();
+        PodSpec podSpec = deployer.createPodSpec(appDeploymentRequest);
+
+        assertThat(podSpec.getContainers().get(0).getEnv()).contains(
+                new EnvVar("POD_NAME", null, new EnvVarSourceBuilder().withFieldRef(new ObjectFieldSelectorBuilder().withFieldPath("metadata.name").build()).build()));
+    }
+
+    @Test
     public void deployWithImagePullSecretDeploymentProperty() {
         AppDefinition definition = new AppDefinition("app-test", null);
 
@@ -892,6 +907,29 @@ public class KubernetesAppDeployerTests {
         assertThat(container.getName()).isEqualTo("bb_s1");
         assertThat(container.getCommand()).containsExactly("sh", "-c", "script1.sh");
     }
+
+    @Test
+    public void testInitContainerEnvironmentVariables() {
+        Map<String, String> props = new HashMap<>();
+        props.put("spring.cloud.deployer.kubernetes.initContainers[0]", "{ \"imageName\": \"busybox:1\", \"environmentVariablesFromFieldRefs\": [\"POD_UID=metadata.uid\"] }");
+        props.put("spring.cloud.deployer.kubernetes.initContainers[1]", "{ \"imageName\": \"busybox:2\", \"configMapRefEnvVars\": [\"myConfigMap\"], \"secretRefEnvVars\": [\"mySecret\"] }");
+
+        AppDefinition definition = new AppDefinition("app-test", null);
+        AppDeploymentRequest appDeploymentRequest = new AppDeploymentRequest(definition, getResource(), props);
+
+        deployer = k8sAppDeployer(new KubernetesDeployerProperties());
+        PodSpec podSpec = deployer.createPodSpec(appDeploymentRequest);
+        assertThat(podSpec.getInitContainers()).isNotEmpty();
+        assertThat(podSpec.getInitContainers().size()).isEqualTo(2);
+        Container container0 = podSpec.getInitContainers().get(0);
+        assertThat(container0.getImage()).isEqualTo("busybox:1");
+        assertThat(container0.getEnv()).containsExactly(new EnvVar("POD_UID", null, new EnvVarSourceBuilder().withFieldRef(new ObjectFieldSelectorBuilder().withFieldPath("metadata.uid").build()).build()));
+        Container container1 = podSpec.getInitContainers().get(1);
+        assertThat(container1.getImage()).isEqualTo("busybox:2");
+        assertThat(container1.getEnvFrom()).containsExactly(new EnvFromSource(new ConfigMapEnvSourceBuilder().withName("myConfigMap").build(), null, null)
+                , new EnvFromSource(null, null, new SecretEnvSourceBuilder().withName("mySecret").build()));
+    }
+
     @Test
     public void testMultipleInitContainerProperties() {
         Map<String, String> props = new HashMap<>();

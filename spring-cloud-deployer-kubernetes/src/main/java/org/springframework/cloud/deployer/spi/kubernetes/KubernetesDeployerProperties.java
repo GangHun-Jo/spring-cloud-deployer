@@ -901,6 +901,8 @@ public class KubernetesDeployerProperties {
          */
         private String[] environmentVariables = new String[]{};
 		private String[] environmentVariablesFromFieldRefs = new String[]{};
+        private String[] configMapRefEnvVars = new String[]{};
+        private String[] secretRefEnvVars = new String[]{};
 
         public String getImageName() {
             return imageName;
@@ -957,7 +959,23 @@ public class KubernetesDeployerProperties {
 		public void setEnvironmentVariablesFromFieldRefs(String[] environmentVariablesFromFieldRefs) {
 			this.environmentVariablesFromFieldRefs = environmentVariablesFromFieldRefs;
 		}
-	}
+
+        public String[] getConfigMapRefEnvVars() {
+            return configMapRefEnvVars;
+        }
+
+        public void setConfigMapRefEnvVars(String[] configMapRefEnvVars) {
+            this.configMapRefEnvVars = configMapRefEnvVars;
+        }
+
+        public String[] getSecretRefEnvVars() {
+            return secretRefEnvVars;
+        }
+
+        public void setSecretRefEnvVars(String[] secretRefEnvVars) {
+            this.secretRefEnvVars = secretRefEnvVars;
+        }
+    }
 
     /**
      * The {@link RestartPolicy} to use. Defaults to {@link RestartPolicy#Always}.
@@ -1334,6 +1352,12 @@ public class KubernetesDeployerProperties {
      * binding.
      */
     private String[] environmentVariables = new String[]{};
+
+    /**
+     * Environment variables from pod field to set for any deployed app container. To be used for service
+     * binding.
+     */
+    private String[] environmentVariablesFromFieldRefs = new String[]{};
 
     /**
      * Entry point style used for the Docker image. To be used to determine how to pass in
@@ -2305,6 +2329,14 @@ public class KubernetesDeployerProperties {
 
     public void setEnvironmentVariables(String[] environmentVariables) {
         this.environmentVariables = environmentVariables;
+    }
+
+    public String[] getEnvironmentVariablesFromFieldRefs() {
+        return environmentVariablesFromFieldRefs;
+    }
+
+    public void setEnvironmentVariablesFromFieldRefs(String[] environmentVariablesFromFieldRefs) {
+        this.environmentVariablesFromFieldRefs = environmentVariablesFromFieldRefs;
     }
 
     public EntryPointStyle getEntryPointStyle() {
